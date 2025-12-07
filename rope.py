@@ -51,6 +51,26 @@ def apply_rotary_emb(
     _, seqlen, _, _ = query.shape
     device = query.device
     # todo
+    inv_freq = 1.0 / (theta ** (torch.arange(0, head_dim, 2, device=device, dtype=torch.float32) / head_dim))
+    # 10000 ^ (-2i/d) (i=0, 1, 2, ..., d/2-1)
+    positions = torch.arange(seqlen, device=device, dtype=torch.float32)
+    freqs = torch.outer(positions, inv_freq)
+    # 1*theta1  1*theta2  1*theta3  1*theta4
+    # 2*theta1  2*theta2  2*theta3  2*theta4
+    # 3*theta1  3*theta2  3*theta3  3*theta4
+    # 4*theta1  4*theta2  4*theta3  4*theta4 みたいなやつ
+    cos = freqs.cos()[:seqlen]
+    sin = freqs.sin()[:seqlen]
+    # queryとkeyの次元について、batch_sizeとn_local_headsは本質的に重要ではなく、並列計算することができればいいので、一つのcosとsin
+    # を作成して、それをbroadcastすることで、queryとkeyの次元に合わせて計算することができる。
+    cos = cos[None, :, None, :] # (1, seqlen, 1, head_dim/2)
+    sin = sin[None, :, None, :]
+    # | 次元     | query_real | cos[None,:] | 結果                |
+    # | ------ | ---------- | ----------- | ----------------- |
+    # | batch  | B          | 1           | 自動で B に broadcast |
+    # | seqlen | S          | S           | 一致                |
+    # | head   | H          | 1           | 自動で H に broadcast |
+    # | dim    | D/2        | D/2         | 一致                |
     #
     # Please refer to slide 22 in https://phontron.com/class/anlp2024/assets/slides/anlp-05-transformers.pdf
     # and Section 3 in https://arxiv.org/abs/2104.09864.
@@ -67,9 +87,12 @@ def apply_rotary_emb(
     # Then, combine these trigonometric values with the tensors query_real, query_imag,
     # key_real, and key_imag.
 
-    raise NotImplementedError
+    q_real_out = query_real * cos - query_imag * sin #奇数行目
+    q_imag_out = query_real * sin + query_imag * cos #偶数行目
+    k_real_out = key_real * cos - key_imag * sin #奇数行目
+    k_imag_out = key_real * sin + key_imag * cos #偶数行目
 
-    query_out = None
-    key_out = None
     # Return the rotary position embeddings for the query and key tensors
+    query_out = torch.stack([q_real_out, q_imag_out], dim=-1).reshape(query.shape).to(query.dtype)
+    key_out = torch.stack([k_real_out, k_imag_out], dim=-1).reshape(key.shape).to(key.dtype)
     return query_out, key_out
