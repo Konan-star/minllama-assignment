@@ -211,7 +211,7 @@ def generate_sentence(args, prefix, outfile, max_new_tokens = 75, temperature = 
 		# run generation
 		with torch.no_grad():
 			with ctx:
-				y = llama.generate(x, max_new_tokens, temperature=temperature)
+				y = llama.generate(x, max_new_tokens, temperature=temperature) # ここで文章生成を実行
 				sentence = enc.decode(y[0].tolist())
 				print(f"Temperature is {temperature}")
 				print(sentence)
@@ -237,7 +237,7 @@ def test_with_prompting(args):
 		#### Load data
 		# create the data and its corresponding datasets and dataloader
 		tokenizer = Tokenizer(args.max_sentence_len)
-		label_names = json.load(open(args.label_names, 'r'))
+		label_names = json.load(open(args.label_names, 'r')) # data/sst-label-mapping.jsonなら["awful", "bad", "average", "good", "excellent"]、data/cfimdb-label-mapping.jsonなら["bad", "good"]
 		_, num_labels = create_data(args.train, tokenizer, 'train')
 
 		#### Init model
@@ -254,7 +254,7 @@ def test_with_prompting(args):
 		else:
 			label_name_str = ", ".join(label_names[:-1]) + ", or " + label_names[-1]
 		prompt_suffix=f"Is this movie {label_name_str}? This movie is "
-		model = LlamaZeroShotClassifier(config, tokenizer, label_names)
+		model = LlamaZeroShotClassifier(config, tokenizer, label_names) # ここでZeroshot分類モデルを初期化
 		model = model.to(device)
 
 		dev_data = create_data(args.dev, tokenizer, 'valid', eos=False, prompt_suffix=prompt_suffix)
