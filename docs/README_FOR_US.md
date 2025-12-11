@@ -89,8 +89,12 @@ sentence = enc.decode(y[0].tolist())
 
 
 ### タスク2: ゼロショット分類 (prompt)
+事前学習済みのモデルで感情分類
+入力文に対して、 各ラベル単語のnext token出現確率を計算 → 最大確率のラベルを選択
+READMEにあるように、TinyStoriesという子供向けデータで学習した4200万パラメータのLLMなので、
+タスク1でそれっぽい単語は生成できるものの、映画レビューの分類というタスクにはそのままでは対応できず
+精度が出ないはず。
 
-パラメータ更新なしで分類
 
 コマンド (SST):
 ```bash
@@ -127,11 +131,6 @@ dev_data = create_data(args.dev, tokenizer, 'valid',
 dev_acc = model_eval(dev_dataloader, model, device)
 ```
 
-仕組み: 入力文+プロンプト → 各ラベル単語の出現確率 → 最大確率のラベルを選択
-
-結果:
-- SST: ~0.21 (ランダムレベル)
-- CFIMDB: ~0.50 (ランダムレベル)
 
 出力:
 - `sst-dev-prompting-output.txt`, `sst-test-prompting-output.txt`
@@ -141,8 +140,8 @@ dev_acc = model_eval(dev_dataloader, model, device)
 
 
 ### タスク3: ファインチューニング (finetune)
-
-分類タスク特化の学習
+実際のレビューデータで、最終のトークン位置の表現を線形変換して分類するモデルを学習（学習自体はllama部分含む）
+これによりタスク2からスコアが上がるはず
 
 コマンド (SST):
 ```bash
@@ -202,9 +201,6 @@ write_predictions_to_file("dev", args.dev_out, dev_acc, dev_pred, dev_sents)
 write_predictions_to_file("test", args.test_out, test_acc, test_pred, test_sents)
 ```
 
-結果:
-- SST: ~0.41 (タスク2: 0.21から改善)
-- CFIMDB: ~0.80 (タスク2: 0.50から改善)
 
 出力:
 - `sst-dev-finetuning-output.txt`, `sst-test-finetuning-output.txt`
