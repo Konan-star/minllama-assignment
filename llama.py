@@ -98,9 +98,27 @@ class Attention(nn.Module):
 
         Make sure to use attention_dropout (self.attn_dropout) on the computed
         attention matrix before applying it to the value tensor.
+
+        query, key, value: (bs, n_local_heads, seqlen, head_dim)
+        ここでスケールド・ドット積アテンションを計算して、
+        出力を (bs, n_local_heads, seqlen, head_dim) で返す。
         '''
-        # todo
-        raise NotImplementedError
+        # TODO
+        # 1. スコア行列 QK^T / sqrt(d_k)
+        # key.transpose(-2, -1) で (..., seqlen, head_dim) → (..., head_dim, seqlen)
+        scores = torch.matmul(query, key.transpose(-2, -1))
+        scores = scores / math.sqrt(self.head_dim)
+
+        # 2. softmax で正規化（各クエリトークン i ごとに「どのトークン j をどれだけ見るか」）
+        attn_weights = F.softmax(scores, dim=-1)
+
+        # 3. attention dropout
+        attn_weights = self.attn_dropout(attn_weights)
+
+        # 4. 重み付き和で value を線形結合: (bs, n_heads, seqlen, head_dim)
+        output = torch.matmul(attn_weights, value)
+
+        return output
 
     def forward(
         self,
