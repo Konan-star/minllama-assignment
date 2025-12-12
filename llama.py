@@ -43,8 +43,14 @@ class RMSNorm(torch.nn.Module):
         Returns:
             torch.Tensor: The normalized tensor.
         """
+        
+
         # todo
-        raise NotImplementedError
+        #My implementation
+        #rms = (1/n*\Sigma(a_i**2) + \epsilon)**(1/2)
+        ms = x.pow(2).mean(dim=-1, keepdim=True)
+        x_norm = x / torch.sqrt(ms + self.eps)
+        return x_norm
 
     def forward(self, x):
         """
@@ -197,7 +203,15 @@ class LlamaLayer(nn.Module):
            output of the feed-forward network
         '''
         # todo
-        raise NotImplementedError
+        # My implementation?
+        x_norm = self.attention_norm(x)  # 1) layer normalization of the input (via Root Mean Square layer normalization)
+        x_attn = self.attention(x_norm)  # 2) self-attention on the layer-normalized input
+        h = x + x_attn                   # 3) a residual connection (i.e., add the input to the output of the self-attention)
+        h_norm = self.ffn_norm(h)        # 3) layer normalization on the output of the self-attention
+        h_ffn = self.feed_forward(h_norm)# 4) a feed-forward network on the layer-normalized output of the self-attention
+        output = h + h_ffn               # 5) add a residual connection from the unnormalized self-attention output to the output of the feed-forward network
+        return output
+
 
 class Llama(LlamaPreTrainedModel):
     def __init__(self, config: LlamaConfig):
