@@ -22,7 +22,7 @@ Rotary Positional Embeddings (RoPE)
 |------|------|
 | `apply_rotary_emb()` | 回転行列による位置エンコーディング |
 
-テスト: `python rope_test.py`
+テスト: `uv run python rope_test.py`
 
 ### llama.py
 Llama2モデルコア
@@ -34,7 +34,7 @@ Llama2モデルコア
 | `Llama.forward()` | モデル全体のforward pass | 全タスク |
 | `Llama.generate()` | Temperature samplingテキスト生成 | タスク1 |
 
-テスト: `python sanity_check.py`
+テスト: `uv run python sanity_check.py`
 
 ### optimizer.py
 AdamWオプティマイザー
@@ -43,7 +43,7 @@ AdamWオプティマイザー
 |------|------|-----------|
 | `AdamW.step()` | パラメータ更新 | タスク3 |
 
-テスト: `python optimizer_test.py`
+テスト: `uv run python optimizer_test.py`
 
 ### classifier.py
 分類ヘッド
@@ -61,7 +61,10 @@ AdamWオプティマイザー
 ### タスク1: テキスト生成 (generate)
 
 ```bash
-python run_llama.py --option generate
+mkdir -p output/task_1
+uv run python run_llama.py --option generate \
+  --generated_sentence_low_temp_out output/task_1/generated-sentence-temp-0.txt \
+  --generated_sentence_high_temp_out output/task_1/generated-sentence-temp-1.txt
 ```
 
 プロンプト: "I have wanted to see this thriller for a while, and it didn't disappoint. Keanu Reeves, playing the hero John Wick, is"
@@ -83,8 +86,8 @@ sentence = enc.decode(y[0].tolist())
 ```
 
 出力:
-- `generated-sentence-temp-0.txt`
-- `generated-sentence-temp-1.txt`
+- `output/task_1/generated-sentence-temp-0.txt`
+- `output/task_1/generated-sentence-temp-1.txt`
 
 
 
@@ -98,19 +101,33 @@ READMEにあるように、TinyStoriesという子供向けデータで学習し
 
 コマンド (SST):
 ```bash
-python run_llama.py --option prompt --batch_size 10 \
+mkdir -p output/task_2
+uv run python run_llama.py --option prompt --batch_size 10 \
   --train data/sst-train.txt --dev data/sst-dev.txt --test data/sst-test.txt \
   --label-names data/sst-label-mapping.json \
-  --dev_out sst-dev-prompting-output.txt --test_out sst-test-prompting-output.txt
+  --dev_out output/task_2/sst-dev-prompting-output.txt \
+  --test_out output/task_2/sst-test-prompting-output.txt
 ```
+
+（実行結果）
+dev acc :: 0.213
+test acc :: 0.224
 
 コマンド (CFIMDB):
 ```bash
-python run_llama.py --option prompt --batch_size 10 \
+mkdir -p output/task_2
+uv run python run_llama.py --option prompt --batch_size 10 \
   --train data/cfimdb-train.txt --dev data/cfimdb-dev.txt --test data/cfimdb-test.txt \
   --label-names data/cfimdb-label-mapping.json \
-  --dev_out cfimdb-dev-prompting-output.txt --test_out cfimdb-test-prompting-output.txt
+  --dev_out output/task_2/cfimdb-dev-prompting-output.txt \
+  --test_out output/task_2/cfimdb-test-prompting-output.txt
 ```
+
+
+（実行結果）
+dev acc :: 0.502
+test acc :: 0.213 # testは全て答えが0だけど、testはほとんど1って予測してる
+
 
 コードフロー (`test_with_prompting`):
 ```python
@@ -131,10 +148,9 @@ dev_data = create_data(args.dev, tokenizer, 'valid',
 dev_acc = model_eval(dev_dataloader, model, device)
 ```
 
-
 出力:
-- `sst-dev-prompting-output.txt`, `sst-test-prompting-output.txt`
-- `cfimdb-dev-prompting-output.txt`, `cfimdb-test-prompting-output.txt`
+- `output/task_2/sst-dev-prompting-output.txt`, `output/task_2/sst-test-prompting-output.txt`
+- `output/task_2/cfimdb-dev-prompting-output.txt`, `output/task_2/cfimdb-test-prompting-output.txt`
 
 注: 実装不要 (`LlamaZeroShotClassifier`は実装済み)
 
@@ -145,18 +161,22 @@ dev_acc = model_eval(dev_dataloader, model, device)
 
 コマンド (SST):
 ```bash
-python run_llama.py --option finetune --epochs 5 --lr 2e-5 --batch_size 80 \
+mkdir -p output/task_3
+uv run python run_llama.py --option finetune --epochs 5 --lr 2e-5 --batch_size 80 \
   --train data/sst-train.txt --dev data/sst-dev.txt --test data/sst-test.txt \
   --label-names data/sst-label-mapping.json \
-  --dev_out sst-dev-finetuning-output.txt --test_out sst-test-finetuning-output.txt
+  --dev_out output/task_3/sst-dev-finetuning-output.txt \
+  --test_out output/task_3/sst-test-finetuning-output.txt
 ```
 
 コマンド (CFIMDB):
 ```bash
-python run_llama.py --option finetune --epochs 5 --lr 2e-5 --batch_size 10 \
+mkdir -p output/task_3
+uv run python run_llama.py --option finetune --epochs 5 --lr 2e-5 --batch_size 10 \
   --train data/cfimdb-train.txt --dev data/cfimdb-dev.txt --test data/cfimdb-test.txt \
   --label-names data/cfimdb-label-mapping.json \
-  --dev_out cfimdb-dev-finetuning-output.txt --test_out cfimdb-test-finetuning-output.txt
+  --dev_out output/task_3/cfimdb-dev-finetuning-output.txt \
+  --test_out output/task_3/cfimdb-test-finetuning-output.txt
 ```
 
 コードフロー:
@@ -203,8 +223,8 @@ write_predictions_to_file("test", args.test_out, test_acc, test_pred, test_sents
 
 
 出力:
-- `sst-dev-finetuning-output.txt`, `sst-test-finetuning-output.txt`
-- `cfimdb-dev-finetuning-output.txt`, `cfimdb-test-finetuning-output.txt`
+- `output/task_3/sst-dev-finetuning-output.txt`, `output/task_3/sst-test-finetuning-output.txt`
+- `output/task_3/cfimdb-dev-finetuning-output.txt`, `output/task_3/cfimdb-test-finetuning-output.txt`
 
 実装必要:
 - `classifier.LlamaEmbeddingClassifier.forward()`
@@ -225,6 +245,6 @@ write_predictions_to_file("test", args.test_out, test_acc, test_pred, test_sents
 
 | ファイル | 対象 | コマンド |
 |---------|------|----------|
-| `rope_test.py` | RoPE | `python rope_test.py` |
-| `optimizer_test.py` | AdamW | `python optimizer_test.py` |
-| `sanity_check.py` | Llama forward pass | `python sanity_check.py` |
+| `rope_test.py` | RoPE | `uv run python rope_test.py` |
+| `optimizer_test.py` | AdamW | `uv run python optimizer_test.py` |
+| `sanity_check.py` | Llama forward pass | `uv run python sanity_check.py` |
