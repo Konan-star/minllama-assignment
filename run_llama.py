@@ -180,7 +180,7 @@ def train(args):
 			loss = F.nll_loss(logits, b_labels.view(-1), reduction='sum') / args.batch_size
 
 			loss.backward()
-			optimizer.step()
+			optimizer.step() # 重みを1step更新
 
 			train_loss += loss.item()
 			num_batches += 1

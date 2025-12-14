@@ -235,9 +235,11 @@ dependencies = [
     { name = "filelock" },
     { name = "importlib-metadata" },
     { name = "numpy" },
+    { name = "packaging" },
     { name = "requests" },
     { name = "scikit-learn" },
     { name = "sentencepiece" },
+    { name = "setuptools" },
     { name = "tokenizers" },
     { name = "torch" },
     { name = "torchaudio" },
@@ -250,9 +252,11 @@ requires-dist = [
     { name = "filelock", specifier = "==3.0.12" },
     { name = "importlib-metadata", specifier = "==3.7.0" },
     { name = "numpy", specifier = "==1.26.3" },
+    { name = "packaging", specifier = ">=25.0" },
     { name = "requests", specifier = "==2.31.0" },
     { name = "scikit-learn", specifier = "==1.2.2" },
     { name = "sentencepiece", specifier = "==0.1.99" },
+    { name = "setuptools", specifier = ">=80.9.0" },
     { name = "tokenizers", specifier = "==0.13.3" },
     { name = "torch", specifier = "==2.1.2" },
     { name = "torchaudio", specifier = "==2.1.2" },
@@ -407,6 +411,15 @@ version = "12.1.105"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/da/d3/8057f0587683ed2fcd4dbfbdfdfa807b9160b809976099d36b8f60d08f03/nvidia_nvtx_cu12-12.1.105-py3-none-manylinux1_x86_64.whl", hash = "sha256:dc21cf308ca5691e7c04d962e213f8a4aa9bbfa23d95412f452254c2caeb09e5", size = 99138, upload-time = "2023-04-19T15:48:43.556Z" },
+]
+
+[[package]]
+name = "packaging"
+version = "25.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f", size = 165727, upload-time = "2025-04-19T11:48:59.673Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469, upload-time = "2025-04-19T11:48:57.875Z" },
 ]
 
 [[package]]
@@ -615,6 +628,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/4d/9d/9153942f0e2143a43978bcefba31d79187b7037bed3f85a6668c69493062/sentencepiece-0.1.99-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:db361e03342c41680afae5807590bc88aa0e17cfd1a42696a160e4005fcda03b", size = 1298412, upload-time = "2023-05-02T04:26:38.709Z" },
     { url = "https://files.pythonhosted.org/packages/e2/9f/35ccc0996432f40b006b1de26c1781ac6a68d9242733d6619bd05285c50e/sentencepiece-0.1.99-cp311-cp311-win32.whl", hash = "sha256:2d95e19168875b70df62916eb55428a0cbcb834ac51d5a7e664eda74def9e1e0", size = 925938, upload-time = "2023-05-02T04:26:40.834Z" },
     { url = "https://files.pythonhosted.org/packages/cc/07/d6951e3b4079df819d76353302fc3e76835252e7e0b6366f96a03d87ea5f/sentencepiece-0.1.99-cp311-cp311-win_amd64.whl", hash = "sha256:f90d73a6f81248a909f55d8e6ef56fec32d559e1e9af045f0b0322637cb8e5c7", size = 977544, upload-time = "2023-05-02T04:26:43.416Z" },
+]
+
+[[package]]
+name = "setuptools"
+version = "80.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c", size = 1319958, upload-time = "2025-05-27T00:56:51.443Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922", size = 1201486, upload-time = "2025-05-27T00:56:49.664Z" },
 ]
 
 [[package]]
