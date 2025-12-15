@@ -7,6 +7,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import classification_report, f1_score, recall_score, accuracy_score
+from torch.utils.tensorboard import SummaryWriter
 
 # change it with respect to the original model
 from classifier import LlamaZeroShotClassifier, LlamaEmbeddingClassifier
@@ -92,29 +93,39 @@ def create_data(filename, tokenizer: Tokenizer, flag: str ='train', lower: bool 
 		return data
 
 # perform model evaluation in terms of the accuracy and f1 score.
-def model_eval(dataloader, model, device):
+def model_eval(dataloader, model, device, compute_loss=False):
 	model.eval() # switch to eval model, will turn off randomness like dropout
 	y_true = []
 	y_pred = []
 	sents = []
+	total_loss = 0
+	num_batches = 0
 	for step, batch in enumerate(tqdm(dataloader, desc=f'eval', disable=TQDM_DISABLE)):
 		b_ids, b_labels, b_sents = batch['token_ids'], batch['labels'], batch['sents']
 
 		b_ids = b_ids.to(device)
+		b_labels = b_labels.to(device)
 
 		logits = model(b_ids)
+		
+		if compute_loss:
+			loss = F.nll_loss(logits, b_labels.view(-1), reduction='mean')
+			total_loss += loss.item()
+			num_batches += 1
+		
 		logits = logits.detach().cpu().numpy()
 		preds = np.argmax(logits, axis=1).flatten()
 
-		b_labels = b_labels.flatten()
+		b_labels = b_labels.cpu().flatten()
 		y_true.extend(b_labels)
 		y_pred.extend(preds)
 		sents.extend(b_sents)
 
 	f1 = f1_score(y_true, y_pred, average='macro')
 	acc = accuracy_score(y_true, y_pred)
+	avg_loss = total_loss / num_batches if num_batches > 0 else None
 
-	return acc, f1, y_pred, y_true, sents
+	return acc, f1, y_pred, y_true, sents, avg_loss
 
 def save_model(model, optimizer, args, config, filepath):
 	save_info = {
@@ -163,6 +174,12 @@ def train(args):
 	## specify the optimizer
 	optimizer = AdamW(model.parameters(), lr=lr)
 	best_dev_acc = 0
+	best_epoch = 0
+
+	# TensorBoard用のSummaryWriter
+	log_dir = args.dev_out.replace("dev-finetuning-output.txt", "tensorboard_logs")
+	writer = SummaryWriter(log_dir=log_dir)
+	global_step = 0
 
 	## run for the specified number of epochs
 	for epoch in tqdm(range(args.epochs)):
@@ -184,17 +201,46 @@ def train(args):
 
 			train_loss += loss.item()
 			num_batches += 1
+			global_step += 1
+
+			# TensorBoardにバッチごとのlossを記録
+			writer.add_scalar('Loss/train_step', loss.item(), global_step)
 
 		train_loss = train_loss / (num_batches)
 
-		train_acc, train_f1, *_ = model_eval(train_dataloader, model, device)
-		dev_acc, dev_f1, *_ = model_eval(dev_dataloader, model, device)
+		train_acc, train_f1, _, _, _, _ = model_eval(train_dataloader, model, device)
+		dev_acc, dev_f1, _, _, _, dev_loss = model_eval(dev_dataloader, model, device, compute_loss=True)
+
+		# TensorBoardにエポックごとのメトリクスを記録
+		writer.add_scalar('Loss/train_epoch', train_loss, epoch)
+		writer.add_scalar('Loss/dev', dev_loss, epoch)
+		writer.add_scalar('Accuracy/train', train_acc, epoch)
+		writer.add_scalar('Accuracy/dev', dev_acc, epoch)
+		writer.add_scalar('F1/train', train_f1, epoch)
+		writer.add_scalar('F1/dev', dev_f1, epoch)
 
 		if dev_acc > best_dev_acc:
 			best_dev_acc = dev_acc
+			best_epoch = epoch
 			save_model(model, optimizer, args, config, args.filepath)
 
 		print(f"epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
+
+	# TensorBoardにハイパーパラメータと最終結果を記録
+	writer.add_hparams(
+		{
+			'lr': args.lr,
+			'batch_size': args.batch_size,
+			'epochs': args.epochs,
+			'hidden_dropout_prob': args.hidden_dropout_prob
+		},
+		{
+			'hparam/best_dev_acc': best_dev_acc,
+			'hparam/best_epoch': best_epoch
+		}
+	)
+	writer.close()
+	print(f"TensorBoard logs saved to {log_dir}")
 
 def generate_sentence(args, prefix, outfile, max_new_tokens = 75, temperature = 0.0):
 	with torch.no_grad():
@@ -265,8 +311,8 @@ def test_with_prompting(args):
 		test_dataset = LlamaDataset(test_data, args, eos=False)
 		test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch_size, collate_fn=test_dataset.collate_fn)
 
-		dev_acc, dev_f1, dev_pred, dev_true, dev_sents = model_eval(dev_dataloader, model, device)
-		test_acc, test_f1, test_pred, test_true, test_sents = model_eval(test_dataloader, model, device)
+		dev_acc, dev_f1, dev_pred, dev_true, dev_sents, _ = model_eval(dev_dataloader, model, device)
+		test_acc, test_f1, test_pred, test_true, test_sents, _ = model_eval(test_dataloader, model, device)
 
 		write_predictions_to_file("dev", args.dev_out, dev_acc, dev_pred, dev_sents)
 		write_predictions_to_file("test", args.test_out, test_acc, test_pred, test_sents)
@@ -291,11 +337,22 @@ def test(args):
 		test_dataset = LlamaDataset(test_data, args)
 		test_dataloader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch_size, collate_fn=test_dataset.collate_fn)
 
-		dev_acc, dev_f1, dev_pred, dev_true, dev_sents = model_eval(dev_dataloader, model, device)
-		test_acc, test_f1, test_pred, test_true, test_sents = model_eval(test_dataloader, model, device)
+		dev_acc, dev_f1, dev_pred, dev_true, dev_sents, dev_loss = model_eval(dev_dataloader, model, device, compute_loss=True)
+		test_acc, test_f1, test_pred, test_true, test_sents, test_loss = model_eval(test_dataloader, model, device, compute_loss=True)
 	
 		write_predictions_to_file("dev", args.dev_out, dev_acc, dev_pred, dev_sents)
 		write_predictions_to_file("test", args.test_out, test_acc, test_pred, test_sents)
+
+		# TensorBoardにテスト結果を記録（最終エポックに合わせる）
+		final_epoch = args.epochs - 1
+		log_dir = args.dev_out.replace("dev-finetuning-output.txt", "tensorboard_logs")
+		writer = SummaryWriter(log_dir=log_dir)
+		writer.add_scalar('Loss/test', test_loss, final_epoch)
+		writer.add_scalar('Accuracy/test', test_acc, final_epoch)
+		writer.add_scalar('F1/test', test_f1, final_epoch)
+		writer.close()
+		print(f"Test results added to TensorBoard logs at {log_dir}")
+		print(f"test loss :: {test_loss:.3f}")
 
 def get_args():
 	parser = argparse.ArgumentParser()

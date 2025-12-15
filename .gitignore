@@ -1,5 +1,5 @@
 __pycache__/
-stories42M.pt
+*.pt
 .venv/
 
 generated-sentence-temp-*.txt

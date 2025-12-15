@@ -179,6 +179,8 @@ uv run python run_llama.py --option finetune --epochs 5 --lr 2e-5 --batch_size 1
   --test_out output/task_3/cfimdb-test-finetuning-output.txt
 ```
 
+tensorboard --logdir output/task_3/
+
 コードフロー:
 
 学習 (`train`):
@@ -229,6 +231,9 @@ write_predictions_to_file("test", args.test_out, test_acc, test_pred, test_sents
 実装必要:
 - `classifier.LlamaEmbeddingClassifier.forward()`
 - `optimizer.AdamW.step()`
+
+
+
 
 ---
 
