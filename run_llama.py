@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import classification_report, f1_score, recall_score, accuracy_score
 
-# change it with respect to the original model
+# change it with respect to the original model	 
 from classifier import LlamaZeroShotClassifier, LlamaEmbeddingClassifier
 from llama import Llama, load_pretrained
 from optimizer import AdamW
@@ -46,9 +46,9 @@ class LlamaDataset(Dataset):
 	def pad_data(self, data):
 		sents = [x[0] for x in data]
 		labels = [x[1] for x in data]
-    	if hasattr(self.p, 'pooling_method') and self.p.pooling_method == 'cls_token':
+		if self.p.pooling_method == 'cls_token':
 			cls_token_id = self.tokenizer.bos_id
-			encoding = [self.tokenizer.encode(s, bos=True, eos=self.eos) for s in sents]
+			encoding = [[cls_token_id] + self.tokenizer.encode(s, bos=False, eos=self.eos) for s in sents]
 		else:
 			encoding = [self.tokenizer.encode(s, bos=True, eos=self.eos) for s in sents]
 		max_length_in_batch = max([len(sentence) for sentence in encoding])
@@ -155,7 +155,8 @@ def train(args):
 			  'pretrained_model_path': args.pretrained_model_path,
 			  'num_labels': num_labels,
 			  'data_dir': '.',
-			  'option': args.option}
+			  'option': args.option,
+			  'pooling_method': args.pooling_method}
 
 	config = SimpleNamespace(**config)
 
@@ -319,6 +320,11 @@ def get_args():
 	parser.add_argument("--generated_sentence_high_temp_out", type=str, default="generated-sentence-temp-1.txt")
 	parser.add_argument("--dev_out", type=str, default="cfimdb-dev-prompting-output.txt")
 	parser.add_argument("--test_out", type=str, default="cfimdb-test-prompting-output.txt")
+	# pooling method の引数を追加
+	parser.add_argument("--pooling_method", type=str, 
+	                    choices=['last_token', 'cls_token', 'mean_pooling', 'max_pooling', 'attention_pooling'],
+	                    default='last_token',
+	                    help='Pooling method for sentence classification')
 
 	# hyper parameters
 	parser.add_argument("--batch_size", help='sst: 64, cfimdb: 8 can fit a 12GB GPU', type=int, default=8)
