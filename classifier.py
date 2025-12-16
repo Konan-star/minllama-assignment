@@ -36,7 +36,13 @@ class LlamaEmbeddingClassifier(torch.nn.Module):
 		self.num_labels = config.num_labels
 		self.llama = load_pretrained(config.pretrained_model_path)
 
-        self.pooling_method = getattr(config, 'pooling_method', 'last_token')  # 'last_token', 'cls_token', 'mean_pooling', 'max_pooling', 'attention_pooling'
+		# pooling方法を選択するオプションを追加
+		self.pooling_method = getattr(config, 'pooling_method', 'last_token')
+		
+		# tokenizerを初期化してpad_idを取得
+		self.tokenizer = Tokenizer()
+		self.pad_token_id = self.tokenizer.pad_id
+		
 		# If we use pretrain mode, we freeze Llama parameters.
 		for param in self.llama.parameters():
 			if config.option == 'pretrain':
@@ -44,14 +50,15 @@ class LlamaEmbeddingClassifier(torch.nn.Module):
 			elif config.option == 'finetune':
 				param.requires_grad = True
 
-        # attention poolingのための重みパラメータ
-        if self.pooling_method == 'attention_pooling':
-            self.attention_weights = torch.nn.Linear(self.llama.config.dim, 1)
+		# attention poolingのための重みパラメータ
+		if self.pooling_method == 'attention_pooling':
+			self.attention_weights = torch.nn.Linear(self.llama.config.dim, 1)
 
 		self.dropout = torch.nn.Dropout(config.hidden_dropout_prob)
 		self.classifier_head = torch.nn.Linear(self.llama.config.dim, self.num_labels)
 
-	def create_attention_weights(self, input_ids, pad_token_id):
+	def create_attention_mask(self, input_ids, pad_token_id):
+		"""パディングトークンのマスクを作成"""
 		return (input_ids != pad_token_id).float()
 
 	def forward(self, input_ids):
@@ -74,7 +81,8 @@ class LlamaEmbeddingClassifier(torch.nn.Module):
 		elif self.pooling_method == 'cls_token':
 			pooled_output = hidden_states[:, 0, :]  # (batch_size, hidden_dim)
 		elif self.pooling_method == 'mean_pooling':
-			attention_mask = self.create_attention_mask(input_ids, self.tokenizer.pad_id)
+			# パディングマスクを作成
+			attention_mask = self.create_attention_mask(input_ids, self.pad_token_id)
 			attention_mask = attention_mask.unsqueeze(-1)  # (batch_size, seq_len, 1)
 			
 			# マスクされた平均プーリング
@@ -84,18 +92,31 @@ class LlamaEmbeddingClassifier(torch.nn.Module):
 			pooled_output = sum_hidden_states / sum_mask
 		elif self.pooling_method == 'max_pooling':
 			# パディングマスクを作成
-			attention_mask = self.create_attention_mask(input_ids, self.tokenizer.pad_id)
+			attention_mask = self.create_attention_mask(input_ids, self.pad_token_id)
 			attention_mask = attention_mask.unsqueeze(-1)  # (batch_size, seq_len, 1)
 			
 			# パディング部分を非常に小さな値に設定
 			masked_hidden_states = hidden_states.masked_fill(attention_mask == 0, float('-inf'))
 			pooled_output, _ = torch.max(masked_hidden_states, dim=1)
 		elif self.pooling_method == 'attention_pooling':
-			pooled_output = self.attention_weights(hidden_states)  
-			attention_weights = torch.nn.functional.softmax(pooled_output, dim=-1)
+			# パディングマスクを作成
+			attention_mask = self.create_attention_mask(input_ids, self.pad_token_id)  # (batch_size, seq_len)
+			
+			# アテンションプーリング：各トークンにスカラー重みを学習
+			attention_scores = self.attention_weights(hidden_states)  # (batch_size, seq_len, 1)
+			attention_scores = attention_scores.squeeze(-1)  # (batch_size, seq_len)
+			
+			# パディング部分を非常に小さな値に設定（softmaxで無視されるように）
+			attention_scores = attention_scores.masked_fill(attention_mask == 0, float('-inf'))
+			
+			# softmaxで正規化してアテンション重みを計算
+			attention_weights = F.softmax(attention_scores, dim=1)  # (batch_size, seq_len)
+			attention_weights = attention_weights.unsqueeze(-1)     # (batch_size, seq_len, 1)
+			
+			# 重み付き和を計算
 			pooled_output = torch.sum(hidden_states * attention_weights, dim=1)  # (batch_size, hidden_dim)
 		else:
-			raise ValueError(f"Invalid pooling method: {self.pooling_method}")
+			raise ValueError(f"Unknown pooling method: {self.pooling_method}")
 		
 		# 2) ドロップアウトを適用（訓練時のみ）
 		pooled_output = self.dropout(pooled_output)
