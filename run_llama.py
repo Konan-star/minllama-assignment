@@ -46,7 +46,11 @@ class LlamaDataset(Dataset):
 	def pad_data(self, data):
 		sents = [x[0] for x in data]
 		labels = [x[1] for x in data]
-		encoding = [self.tokenizer.encode(s, bos=True, eos=self.eos) for s in sents]
+    	if hasattr(self.p, 'pooling_method') and self.p.pooling_method == 'cls_token':
+			cls_token_id = self.tokenizer.bos_id
+			encoding = [self.tokenizer.encode(s, bos=True, eos=self.eos) for s in sents]
+		else:
+			encoding = [self.tokenizer.encode(s, bos=True, eos=self.eos) for s in sents]
 		max_length_in_batch = max([len(sentence) for sentence in encoding])
 		encoding_padded = [sentence + [self.tokenizer.pad_id] * (max_length_in_batch - len(sentence)) for sentence in encoding]
 		token_ids = torch.LongTensor(encoding_padded)
